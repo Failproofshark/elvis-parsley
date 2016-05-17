@@ -46,7 +46,6 @@
                                                    (loop for current-character = (read-char stream)
                                                          until (char= current-character #\")
                                                          do (write-char current-character new-string)))))
-                                 (read-char stream)
                                  `(:type "string" :value ,read-value))))
                       (with-input-from-string (the-json "{\"test_key\" : \"test_value\"}")
                         (loop for current-char = (peek-char t the-json nil)
