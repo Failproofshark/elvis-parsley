@@ -93,14 +93,15 @@
   (labels ((parse-object (token-stream)
              `(:type :object
                :key-value-pairs ,(labels ((parse-key-value-pairs (token-stream key-value-pairs)
-                                            (let ((current-token (car token-stream)))
-                                              (if (and (eq :punctuation (getf current-token :type))
-                                                       (char= #\} (getf current-token :value)))
-                                                  key-value-pairs
-                                                    ;; The next call should be
-                                                  (parse-key-value-pairs (cdddr token-stream) (append key-value-pairs `(:key ,(getf current-token :value)
-                                                                                                                             ;; The value occurs AFTER the ":" token
-                                                                                                                        :value ,(temp-parse (cddr token-stream)))))))))
+                                            (let* ((current-token (car token-stream))
+                                                   (token-type (getf current-token :type))
+                                                   (token-value (getf current-token :value)))
+                                              (cond ((and (eq :punctuation token-type) (char= #\} token-value)) key-value-pairs)
+                                                    ((and (eq :punctuation token-type) (char= #\, token-value) (parse-key-value-pairs (cdr token-stream) key-value-pairs)))
+                                                    ;; we wrap the result in a list because key-value pairs is supposed to be a list of p-lists
+                                                    (t (parse-key-value-pairs (cdddr token-stream) (append key-value-pairs `((:key ,(getf current-token :value)
+                                                                                                                                    ;; The value occurs AFTER the ":" token
+                                                                                                                               :value ,(temp-parse (cddr token-stream)))))))))))
                                    (parse-key-value-pairs token-stream '()))))
            (parse-string (token-stream)
              `(:type :string :value ,(getf (car token-stream) :value))))
