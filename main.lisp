@@ -6,10 +6,18 @@
 
 (defpackage :elvis-parsley
   (:use :cl
-        :alexandria)
+   :alexandria)
+  (:import-from :cl-ppcre
+               :create-scanner
+               :scan)
   (:export :parse))
 
 (in-package :elvis-parsley)
+
+;; TODO Should x. where x is a number count as a float?
+(defvar *float-re-test* (create-scanner '(:sequence (:greedy-repetition 1 nil :digit-class) 
+                                          #\. 
+                                          (:greedy-repetition 1 nil :digit-class))))
 
 (defclass ast ()
   ((source :initarg :the-source
@@ -104,7 +112,13 @@
                                                                                                                                :value ,(temp-parse (cddr token-stream)))))))))))
                                    (parse-key-value-pairs token-stream '()))))
            (parse-string (token-stream)
-             `(:type :string :value ,(getf (car token-stream) :value))))
+             `(:type :string :value ,(getf (car token-stream) :value)))
+           (parse-number (token-stream)
+             (let ((value (getf (car token-stream) :value)))
+               (if (scan *float-re-test* value)
+                   `(:type :float :value ,value)
+                   `(:type :int :value ,value)))))
     (let ((current-token (car token-stream)))
       (cond ((and (eq :punctuation (getf current-token :type)) (char= #\{ (getf current-token :value))) (parse-object (cdr token-stream)))
-            ((eq :string (getf current-token :type)) (parse-string token-stream))))))
+            ((eq :string (getf current-token :type)) (parse-string token-stream))
+            ((eq :number (getf current-token :type)) (parse-number token-stream))))))

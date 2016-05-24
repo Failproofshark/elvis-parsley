@@ -3,5 +3,6 @@
   :version "1.0.0"
   :author "Bryan Baraoidan"
   :license "MIT"
-  :depends-on (:alexandria)
+  :depends-on (:alexandria
+               :cl-ppcre)
   :components ((:file "main")))
