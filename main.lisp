@@ -123,8 +123,8 @@
                                                              (parse-key-value-pairs remaining-tokens
                                                                                     :key
                                                                                     (append key-value-pairs
-                                                                                            `(:key ,(getf current-key :value)
-                                                                                              :value ,parsed-value))
+                                                                                            `((:key ,(getf current-key :value)
+                                                                                                :value ,parsed-value)))
                                                                                     nil)))))))
                (multiple-value-bind (key-value-pairs remaining-tokens)
                    (parse-key-value-pairs (cdr token-stream)
