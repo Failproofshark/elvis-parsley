@@ -97,6 +97,7 @@
 ;; broken case: (defparameter *foo* (make-instance 'json-ast :the-source (make-string-input-stream "{\"tk\":{\"subk1\": \"subv1\", \"subk2\":2, \"subk3\":{\"ssubk1\":\"ssubv1\"}}, \"tk2\":\"tv2\", \"num1\":1.4}")))
 
 ;;TODO use pop to move the list along OR keep track of far you need to move with some sort of counter and use nthcdr
+;;TODO move this from recursive to iterative, or simply make this destructive ...
 (defun temp-parse (token-stream)
   (declare (optimize (debug 3)))
   ;; Each parse-function accepts a token and a state which is a symbol :key or :value indicating what exactly we're looking (useful for naming and stuff)
@@ -134,6 +135,18 @@
                  (values-list `((:type :object
                                  :key-value-pairs ,key-value-pairs)
                                 ,remaining-tokens)))))
+           ;; We are assuming a uniform array structure hence we simply return the first item we parse to signify the overall structure and return the remaining tokens after the closing square bracket
+           (parse-array (token-stream)
+             (multiple-value-bind (array-structure remaining-tokens)
+                 (temp-parse token-stream)
+               (let* ((skip-count (loop for token in remaining-tokens
+                                        count t into token-count
+                                        when (and (eq (getf token :type) :punctuation) (char= (getf token :value) #\]))
+                                          do (return token-count)))
+                      (post-array-tokens (nthcdr skip-count token-stream)))
+                 (values-list `((:type :array
+                                 :array-structure ,array-structure)
+                                ,post-array-tokens)))))
            (parse-string (token-stream)
              (values-list
               `((:type :string :value ,(getf (car token-stream) :value))
@@ -146,5 +159,6 @@
                             ,(cdr token-stream)))))
     (let ((current-token (car token-stream)))
       (cond ((and (eq :punctuation (getf current-token :type)) (char= #\{ (getf current-token :value))) (parse-object (cdr token-stream)))
+            ((and (eq :punctuation (getf current-token :type)) (char= #\[ (getf current-token :value))) (parse-array (cdr token-stream)))
             ((eq :string (getf current-token :type)) (parse-string token-stream))
             ((eq :number (getf current-token :type)) (parse-number token-stream))))))
