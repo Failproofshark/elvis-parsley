@@ -4,5 +4,6 @@
   :author "Bryan Baraoidan"
   :license "MIT"
   :depends-on (:alexandria
-               :cl-ppcre)
+               :cl-ppcre
+               :prove)
   :components ((:file "main")))
