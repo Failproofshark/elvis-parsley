@@ -96,6 +96,7 @@
 ;;TODO use pop to move the list along OR keep track of far you need to move with some sort of counter and use nthcdr
 ;;TODO move this from recursive to iterative, or simply make this destructive ...
 (defmethod parse ((current-ast json-ast))
+  (declare (optimize (debug 3)))
   ;; Each parse-function accepts a token and a state which is a symbol :key or :value indicating what exactly we're looking (useful for naming and stuff)  
   (labels ((parse-implementation (token-stream)
            (labels ((parse-object (token-stream)
@@ -139,7 +140,7 @@
                                                  count t into token-count
                                                  when (and (eq (getf token :type) :punctuation) (char= (getf token :value) #\]))
                                                    do (return token-count)))
-                               (post-array-tokens (nthcdr skip-count token-stream)))
+                               (post-array-tokens (nthcdr skip-count remaining-tokens)))
                           (values-list `((:type :array
                                           :array-structure ,array-structure)
                                          ,post-array-tokens)))))

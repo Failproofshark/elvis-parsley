@@ -15,7 +15,7 @@
 
 (defparameter *complex-object-array* (make-instance 'json-ast :the-source (make-string-input-stream "[{\"o1k1\":{\"o1s1ok\":1, \"o1s2ok\":\"blah\"}, \"o1k2\":4.5}, {\"o1k1\":{\"o1s1ok\":8, \"o1s2ok\":\"melp\"}, \"o1k2\":20.567}]")))
 
-(defparameter *object-with-array-element* (make-instance 'json-ast :the-source (make-string-input-stream "{\"tk1\":[1,2,3], \"tk2\":[{\"e1\":\"v1\"}, {\"e2\":\"v2\"}], \"tk3\":4, \"tk4\":[\"blah\",\"bar\"]}")))
+(defparameter *object-with-array-element* (make-instance 'json-ast :the-source (make-string-input-stream "{\"tk1\":[1,2,3], \"tk2\":[{\"e1\":\"v1\"}, {\"e1\":\"v2\"}], \"tk3\":4, \"tk4\":[\"blah\",\"bar\"]}")))
 
 ;;TODO create test cases for invalid JSON including mismatch brackets, incorrect numbers, and incorrect keywords, missing commas
 (plan 6)
@@ -50,6 +50,6 @@
 (is (parse *object-with-array-element*) '(:type :object :key-value-pairs ((:key "tk1" :value (:type :array :array-structure (:type :int)))
                                                                           (:key "tk2" :value (:type :array :array-structure (:type :object :key-value-pairs ((:key "e1" :value (:type :string))))))
                                                                           (:key "tk3" :value (:type :int))
-                                                                          (:key "tk4" :value (:type :string)))))
+                                                                          (:key "tk4" :value (:type :array :array-structure (:type :string))))))
 
 (finalize)
