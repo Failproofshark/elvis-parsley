@@ -11,11 +11,11 @@
                :create-scanner
                :scan)
   (:export :json-ast
-           :parse))
+           :parse
+           :tokens))
 
 (in-package :elvis-parsley)
 
-;; TODO Should x. where x is a number count as a float?
 (defvar *float-re-test* (create-scanner '(:sequence (:greedy-repetition 1 nil :digit-class) 
                                           #\. 
                                           (:greedy-repetition 1 nil :digit-class))))
@@ -74,6 +74,7 @@
                                                                          (char= current-character #\space))))))
                        (if (is-keyword value)
                            `(:type :keyword :value ,value)
+                           ;;TODO should the tokenizer decide what kind of number we're looking at?
                            `(:type :number :value ,value))))
                    
                    (read-punctuation (stream)
@@ -166,5 +167,7 @@
                      ((and (eq :punctuation (getf current-token :type)) (char= #\[ (getf current-token :value))) (parse-array (cdr token-stream)))
                      ((eq :string (getf current-token :type)) (parse-string token-stream))
                      ((eq :number (getf current-token :type)) (parse-number token-stream))
-                     ((eq :keyword (getf current-token :type)) (parse-keyword token-stream)))))))
+                     ((eq :keyword (getf current-token :type)) (parse-keyword token-stream))
+                     ;;Empty token stream is valid
+                     (t nil))))))
     (parse-implementation (tokens current-ast))))
