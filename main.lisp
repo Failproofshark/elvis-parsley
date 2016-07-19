@@ -18,9 +18,9 @@
 
 (in-package :elvis-parsley)
 
-(defvar *float-re-test* (create-scanner '(:sequence (:greedy-repetition 1 nil :digit-class) 
+(defvar *float-re-test* (create-scanner '(:sequence (:greedy-repetition 0 nil :digit-class) 
                                           #\. 
-                                          (:greedy-repetition 1 nil :digit-class))))
+                                          (:greedy-repetition 0 nil :digit-class))))
 
 (defclass ast ()
   ((source :initarg :source
@@ -97,7 +97,6 @@
                                                                            ;;TODO may need to change this depending on if this is present in a given lisp implementation
                                                                            (char= current-character #\space))))))
                          (cond ((is-keyword value) `(:type :keyword :value ,value))
-                             ;;TODO should the tokenizer decide what kind of number we're looking at?                   
                                ((is-number value) `(:type :number :value ,value))
                                (t (error 'invalid-token :erroneous-value value)))))
                      
