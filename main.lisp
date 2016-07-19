@@ -83,10 +83,12 @@
                        (or (scan integer-scanner token)
                            (scan fraction-scanner token)
                            (scan whole-fraction-scanner token)))
+                     
                      (read-until-termination (stream condition)
                        (with-output-to-string (new-string)
-                         (loop for current-character = (peek-char t stream)
-                               until (funcall condition current-character)
+                         (loop for current-character = (peek-char t stream nil :END-OF-FILE)
+                               until (or (eql current-character :END-OF-FILE)
+                                         (funcall condition current-character))
                                do (write-char (read-char stream) new-string))))
 
                      (read-unquoted-string (stream)
