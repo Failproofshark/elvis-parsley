@@ -44,6 +44,13 @@
 
 (defmethod lex ((current-ast json-ast))
   (let ((integer-scanner (create-scanner '(:sequence (:greedy-repetition 1 nil :digit-class))))
+        ;; This covers the case of a number followed by a period then nothing following e.g. 2. or 1.
+        ;; We do not include this in the regular fraction scanner because [0-9]*\.[0-9]* would mean that a lone period is a valid number which is incorrect
+        (whole-fraction-scanner (create-scanner '(:sequence
+                                                  :start-anchor
+                                                  (:greedy-repetition 1 nil :digit-class)
+                                                  #\.
+                                                  :end-anchor)))
         (fraction-scanner (create-scanner '(:sequence
                                             :start-anchor
                                             (:greedy-repetition 0 nil :digit-class)
@@ -74,8 +81,8 @@
 
                      (is-number (token)
                        (or (scan integer-scanner token)
-                           (scan fraction-scanner token)))
-
+                           (scan fraction-scanner token)
+                           (scan whole-fraction-scanner token)))
                      (read-until-termination (stream condition)
                        (with-output-to-string (new-string)
                          (loop for current-character = (peek-char t stream)
@@ -87,7 +94,7 @@
                                                                        (or (char= current-character #\})
                                                                            (char= current-character #\])
                                                                            (char= current-character #\,)
-                                                                           ;;TODO may need to change this depending on if this is present in a given implementation
+                                                                           ;;TODO may need to change this depending on if this is present in a given lisp implementation
                                                                            (char= current-character #\space))))))
                          (cond ((is-keyword value) `(:type :keyword :value ,value))
                              ;;TODO should the tokenizer decide what kind of number we're looking at?                   
@@ -109,7 +116,7 @@
                     collect (cond ((is-punctuation current-character) (read-punctuation source))
                                   ((is-open-quote current-character) (read-in-string source))
                                   ((is-start-of-keyword current-character) (read-unquoted-string source))
-                                  ((digit-char-p current-character) (read-unquoted-string source)))))))))
+                                  ((or (digit-char-p current-character) (char= current-character #\.)) (read-unquoted-string source)))))))))
 
 ;;TODO use pop to move the list along OR keep track of far you need to move with some sort of counter and use nthcdr
 ;;TODO move this from recursive to iterative, or simply make this destructive ...
