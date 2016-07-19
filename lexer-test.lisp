@@ -93,6 +93,11 @@
   (is-error (tokens (make-instance 'json-ast :source bad-keyword-stream))
             'invalid-token))
 
+(diag "unterminated string")
+(let ((unterminated-string (make-string-input-stream "{\"tk1\":\"tv1}")))
+  (is-error (tokens (make-instance 'json-ast :source unterminated-string))
+            'invalid-token))
+
 ;;TODO write "correct" response tests for lexer
 ;;This test is based on an error I found from my own testing
 (diag "Unterminated object with number values (\"numbers are known as unquoted objects\")")
