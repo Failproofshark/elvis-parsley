@@ -6,7 +6,7 @@
 (in-package :parser-test)
 
 (defun create-test-object (json-string)
-    (make-instance 'json-ast :the-source (make-string-input-stream json-string)))
+    (make-instance 'json-ast :source (make-string-input-stream json-string)))
 
 (defparameter *simple-flat-object* (create-test-object "{\"tk1\":\"tk2\", \"tk2\":2, \"tk3\":3.4, \"tk4\": true, \"tk5\": null}"))
 

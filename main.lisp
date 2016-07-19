@@ -13,8 +13,8 @@
   (:export :json-ast
            :parse
            :tokens
-           :invalid-number-token
-           :invalid-keyword-token))
+           :invalid-token
+           :erroneous-value))
 
 (in-package :elvis-parsley)
 
@@ -23,7 +23,7 @@
                                           (:greedy-repetition 1 nil :digit-class))))
 
 (defclass ast ()
-  ((source :initarg :the-source
+  ((source :initarg :source
            :accessor source)
    (tokens :accessor tokens)
    (tree :accessor tree)))
@@ -38,68 +38,78 @@
 (defmethod initialize-instance :after ((current-ast json-ast) &key &allow-other-keys)
   (lex current-ast))
 
-(define-condition invalid-number-token (error)
-  ())
-(define-condition invalid-keyword-token (error)
-  ())
+(define-condition invalid-token (error)
+  ((erroneous-value :initarg :erroneous-value
+                    :accessor erroneous-value)))
 
 (defmethod lex ((current-ast json-ast))
-  (with-accessors ((source source) (tokens tokens)) current-ast
-    (setf tokens
-          (labels ((contains (current-character search-string)
-                     (loop for search-character across search-string
-                           when (char= current-character search-character)
-                             do (return t)))
-                   
-                   (is-punctuation (current-character)
-                     (contains current-character ":,{}[]"))
+  (let ((integer-scanner (create-scanner '(:sequence (:greedy-repetition 1 nil :digit-class))))
+        (fraction-scanner (create-scanner '(:sequence
+                                            :start-anchor
+                                            (:greedy-repetition 0 nil :digit-class)
+                                            #\.
+                                            (:greedy-repetition 1 nil :digit-class)
+                                            :end-anchor))))
+    (with-accessors ((source source) (tokens tokens)) current-ast
+      (setf tokens
+            (labels ((contains (current-character search-string)
+                       (loop for search-character across search-string
+                             when (char= current-character search-character)
+                               do (return t)))
+                     
+                     (is-punctuation (current-character)
+                       (contains current-character ":,{}[]"))
 
-                   (is-start-of-keyword (current-character)
-                     ;;Note we know it's a keyword because it does NOT follow a double quotation mark
-                     (contains current-character "tfn"))
-                   
-                   (is-open-quote (current-character)
-                     (char= current-character #\"))
-                   
-                   (is-keyword (word)
-                     (loop for keyword in '("true" "false" "null")
-                           when (string= word keyword)
-                             do (return t)))
+                     (is-start-of-keyword (current-character)
+                       ;;Note we know it's a keyword because it does NOT follow a double quotation mark
+                       (contains current-character "tfn"))
+                     
+                     (is-open-quote (current-character)
+                       (char= current-character #\"))
+                     
+                     (is-keyword (word)
+                       (loop for keyword in '("true" "false" "null")
+                             when (string= word keyword)
+                               do (return t)))
 
-                   (read-until-termination (stream condition)
-                     (with-output-to-string (new-string)
-                       (loop for current-character = (peek-char t stream)
-                             until (funcall condition current-character)
-                             do (write-char (read-char stream) new-string))))
+                     (is-number (token)
+                       (or (scan integer-scanner token)
+                           (scan fraction-scanner token)))
 
-                   (read-unquoted-string (stream)
-                     (let ((value (read-until-termination stream #'(lambda (current-character)
-                                                                     (or (char= current-character #\})
-                                                                         (char= current-character #\])
-                                                                         (char= current-character #\,)
-                                                                         ;;TODO may need to change this depending on if this is present in a given implementation
-                                                                         (char= current-character #\space))))))
-                       (if (is-keyword value)
-                           `(:type :keyword :value ,value)
-                           ;;TODO should the tokenizer decide what kind of number we're looking at?
-                           `(:type :number :value ,value))))
-                   
-                   (read-punctuation (stream)
+                     (read-until-termination (stream condition)
+                       (with-output-to-string (new-string)
+                         (loop for current-character = (peek-char t stream)
+                               until (funcall condition current-character)
+                               do (write-char (read-char stream) new-string))))
+
+                     (read-unquoted-string (stream)
+                       (let ((value (read-until-termination stream #'(lambda (current-character)
+                                                                       (or (char= current-character #\})
+                                                                           (char= current-character #\])
+                                                                           (char= current-character #\,)
+                                                                           ;;TODO may need to change this depending on if this is present in a given implementation
+                                                                           (char= current-character #\space))))))
+                         (cond ((is-keyword value) `(:type :keyword :value ,value))
+                             ;;TODO should the tokenizer decide what kind of number we're looking at?                   
+                               ((is-number value) `(:type :number :value ,value))
+                               (t (error 'invalid-token :erroneous-value value)))))
+                     
+                     (read-punctuation (stream)
                        `(:type :punctuation :value ,(read-char stream)))
-                   
-                   (read-in-string (stream)
-                     (read-char stream)
-                     (let ((value (read-until-termination stream #'(lambda (current-character)
-                                                                     (char= current-character #\")))))
+                     
+                     (read-in-string (stream)
                        (read-char stream)
-                       `(:type :string :value ,value))))
-            
-            (loop for current-character = (peek-char t source nil)
-                  while current-character
-                  collect (cond ((is-punctuation current-character) (read-punctuation source))
-                                ((is-open-quote current-character) (read-in-string source))
-                                ((is-start-of-keyword current-character) (read-unquoted-string source))
-                                ((digit-char-p current-character) (read-unquoted-string source))))))))
+                       (let ((value (read-until-termination stream #'(lambda (current-character)
+                                                                       (char= current-character #\")))))
+                         (read-char stream)
+                         `(:type :string :value ,value))))
+              
+              (loop for current-character = (peek-char t source nil)
+                    while current-character
+                    collect (cond ((is-punctuation current-character) (read-punctuation source))
+                                  ((is-open-quote current-character) (read-in-string source))
+                                  ((is-start-of-keyword current-character) (read-unquoted-string source))
+                                  ((digit-char-p current-character) (read-unquoted-string source)))))))))
 
 ;;TODO use pop to move the list along OR keep track of far you need to move with some sort of counter and use nthcdr
 ;;TODO move this from recursive to iterative, or simply make this destructive ...
