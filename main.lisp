@@ -12,7 +12,9 @@
                :scan)
   (:export :json-ast
            :parse
-           :tokens))
+           :tokens
+           :invalid-number-token
+           :invalid-keyword-token))
 
 (in-package :elvis-parsley)
 
@@ -35,6 +37,11 @@
 
 (defmethod initialize-instance :after ((current-ast json-ast) &key &allow-other-keys)
   (lex current-ast))
+
+(define-condition invalid-number-token (error)
+  ())
+(define-condition invalid-keyword-token (error)
+  ())
 
 (defmethod lex ((current-ast json-ast))
   (with-accessors ((source source) (tokens tokens)) current-ast
