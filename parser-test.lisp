@@ -71,7 +71,7 @@
 
 (diag "unterminated embedded object")
 (let ((unterminated-embedded-object (create-test-object "{\"tk1\":\"tv1\", \"tk2\":{\"sk1\":{\"s2k1\":\"s2v1\"}}")))
-  (pass "unterminated embedded object"))
+  (is-error (parse unterminated-embedded-object) 'unterminated-object))
 
 (diag "unterminated array")
 (let ((unterminated-array (create-test-object "[1,2,3")))

@@ -136,6 +136,8 @@
 ;;TODO move this from recursive to iterative, or simply make this destructive ...
 (define-condition unterminated-object (error)
   ())
+(define-condition missing-key (error)
+  ())
 
 (defmethod parse ((current-ast json-ast))
   (declare (optimize (debug 3)))
