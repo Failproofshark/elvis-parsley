@@ -5,7 +5,7 @@
    :elvis-parsley))
 (in-package :lexer-test)
 
-(plan 8)
+(plan 9)
 
 (diag "Normal object test case")
 (let ((normal-object (make-string-input-stream "{\"tk1\":1, \"tk2\":2.8, \"tk3\":\"tv3\", \"tk4\":true, \"tk5\":false, \"tk6\":null, \"tk7\":{\"sk1\":\"sv1\"}, \"tk8\":[1,2,3], \"tk9\":3., \"tk10\":432, \"tk11\":.14}")))

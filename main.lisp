@@ -14,7 +14,8 @@
            :parse
            :tokens
            :invalid-token
-           :erroneous-value))
+           :erroneous-value
+           :invalid-json-format))
 
 (in-package :elvis-parsley)
 
@@ -42,7 +43,11 @@
   ((erroneous-value :initarg :erroneous-value
                     :accessor erroneous-value)))
 
+(define-condition invalid-parsing-case (error)
+  ((erroneous-value :initarg :erroneous-value
+                    :accessor erroneous-value)))
 (defmethod lex ((current-ast json-ast))
+  (declare (optimize (debug 3)))
   (let ((integer-scanner (create-scanner '(:sequence (:greedy-repetition 1 nil :digit-class))))
         ;; This covers the case of a number followed by a period then nothing following e.g. 2. or 1.
         ;; We do not include this in the regular fraction scanner because [0-9]*\.[0-9]* would mean that a lone period is a valid number which is incorrect
@@ -85,19 +90,22 @@
                            (scan whole-fraction-scanner token)))
                      
                      (read-until-termination (stream condition)
-                       (with-output-to-string (new-string)
+                       (let ((new-string (make-string-output-stream)))
                          (loop for current-character = (peek-char t stream nil :END-OF-FILE)
-                               until (or (eql current-character :END-OF-FILE)
-                                         (funcall condition current-character))
-                               do (write-char (read-char stream) new-string))))
+                               do (cond ((eql current-character :END-OF-FILE) (return (values-list `(:END-OF-FILE ,(get-output-stream-string new-string)))))
+                                        ((funcall condition current-character) (return (get-output-stream-string new-string)))
+                                        (t (write-char (read-char stream) new-string))))))
 
                      (read-unquoted-string (stream)
-                       (let ((value (read-until-termination stream #'(lambda (current-character)
-                                                                       (or (char= current-character #\})
-                                                                           (char= current-character #\])
-                                                                           (char= current-character #\,)
-                                                                           ;;TODO may need to change this depending on if this is present in a given lisp implementation
-                                                                           (char= current-character #\space))))))
+                       (let* ((value-read (multiple-value-list (read-until-termination stream #'(lambda (current-character)
+                                                                                                   (or (char= current-character #\})
+                                                                                                       (char= current-character #\])
+                                                                                                       (char= current-character #\,)
+                                                                                                       ;;TODO may need to change this depending on if this is present in a given lisp implementation
+                                                                                                       (char= current-character #\space))))))
+                              (value (if (> (length value-read) 1)
+                                         (cadr value-read)
+                                         (car value-read))))
                          (cond ((is-keyword value) `(:type :keyword :value ,value))
                                ((is-number value) `(:type :number :value ,value))
                                (t (error 'invalid-token :erroneous-value value)))))
@@ -109,18 +117,25 @@
                        (read-char stream)
                        (let ((value (read-until-termination stream #'(lambda (current-character)
                                                                        (char= current-character #\")))))
-                         (read-char stream)
-                         `(:type :string :value ,value))))
+                         (if (eql :END-OF-FILE value)
+                             (error 'invalid-token :erroneous-value value)
+                             (progn
+                               (read-char stream)
+                               `(:type :string :value ,value))))))
               
               (loop for current-character = (peek-char t source nil)
                     while current-character
                     collect (cond ((is-punctuation current-character) (read-punctuation source))
                                   ((is-open-quote current-character) (read-in-string source))
                                   ((is-start-of-keyword current-character) (read-unquoted-string source))
-                                  ((or (digit-char-p current-character) (char= current-character #\.)) (read-unquoted-string source)))))))))
+                                  ((or (digit-char-p current-character) (char= current-character #\.)) (read-unquoted-string source))
+                                  (t (error 'invalid-parsing-case :erroneous-value current-character)))))))))
 
 ;;TODO use pop to move the list along OR keep track of far you need to move with some sort of counter and use nthcdr
 ;;TODO move this from recursive to iterative, or simply make this destructive ...
+(define-condition invalid-json-format (error)
+  ())
+
 (defmethod parse ((current-ast json-ast))
   (declare (optimize (debug 3)))
   ;; Each parse-function accepts a token and a state which is a symbol :key or :value indicating what exactly we're looking (useful for naming and stuff)  
@@ -130,7 +145,8 @@
                                  (let* ((current-token (car token-stream))
                                         (token-type (getf current-token :type))
                                         (token-value (getf current-token :value)))
-                                   (cond ((and (eq :punctuation token-type) (char= #\} token-value)) (values-list `(,key-value-pairs
+                                   (cond ((null token-stream (error 'invalid-json-format))
+                                          (and (eq :punctuation token-type) (char= #\} token-value)) (values-list `(,key-value-pairs
                                                                                                                     ,(cdr token-stream))))
                                          ((and (eq :punctuation token-type)
                                                (or (char= #\, token-value) (char= #\: token-value))) (parse-key-value-pairs (cdr token-stream)
@@ -180,6 +196,7 @@
                                             `(:type :float)
                                             `(:type :int)))
                                      ,(cdr token-stream))))
+
                     (parse-keyword (token-stream)
                       (let* ((current-token-value (getf (car token-stream) :value))
                              ;;TODO add the default case to raise a condition of malformed keyword
