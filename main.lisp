@@ -15,7 +15,7 @@
            :tokens
            :invalid-token
            :erroneous-value
-           :invalid-json-format))
+           :unterminated-object))
 
 (in-package :elvis-parsley)
 
@@ -46,6 +46,7 @@
 (define-condition invalid-parsing-case (error)
   ((erroneous-value :initarg :erroneous-value
                     :accessor erroneous-value)))
+
 (defmethod lex ((current-ast json-ast))
   (declare (optimize (debug 3)))
   (let ((integer-scanner (create-scanner '(:sequence (:greedy-repetition 1 nil :digit-class))))
@@ -131,9 +132,9 @@
                                   ((or (digit-char-p current-character) (char= current-character #\.)) (read-unquoted-string source))
                                   (t (error 'invalid-parsing-case :erroneous-value current-character)))))))))
 
-;;TODO use pop to move the list along OR keep track of far you need to move with some sort of counter and use nthcdr
+;;TODO use pop to move the list along OR keep track of how far you need to move with some sort of counter and use nthcdr
 ;;TODO move this from recursive to iterative, or simply make this destructive ...
-(define-condition invalid-json-format (error)
+(define-condition unterminated-object (error)
   ())
 
 (defmethod parse ((current-ast json-ast))
@@ -145,9 +146,9 @@
                                  (let* ((current-token (car token-stream))
                                         (token-type (getf current-token :type))
                                         (token-value (getf current-token :value)))
-                                   (cond ((null token-stream (error 'invalid-json-format))
-                                          (and (eq :punctuation token-type) (char= #\} token-value)) (values-list `(,key-value-pairs
-                                                                                                                    ,(cdr token-stream))))
+                                   (cond ((null current-token) (error 'unterminated-object))
+                                         ((and (eq :punctuation token-type) (char= #\} token-value)) (values-list `(,key-value-pairs
+                                                                                                                ,(cdr token-stream))))
                                          ((and (eq :punctuation token-type)
                                                (or (char= #\, token-value) (char= #\: token-value))) (parse-key-value-pairs (cdr token-stream)
                                                                                                                             current-state
@@ -165,7 +166,8 @@
                                                                                              (append key-value-pairs
                                                                                                      `((:key ,(getf current-key :value)
                                                                                                         :value ,parsed-value)))
-                                                                                             nil)))))))
+                                                                                             nil)))
+                                         (t (error 'invalid-json-format))))))
                         (multiple-value-bind (key-value-pairs remaining-tokens)
                             (parse-key-value-pairs (cdr token-stream)
                                                    :value
