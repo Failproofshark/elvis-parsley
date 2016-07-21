@@ -88,20 +88,23 @@
 
 (diag "unterminated array")
 (let ((unterminated-array (create-test-object "[1,2,3")))
-  (pass "unterminated array"))
+  (is-error (parse unterminated-array) 'invalid-json-format))
 
 (diag "array missing comma")
-;;Technically speaking this isn't a huge problem given that we really only look at the FIRST element of the array but we make sure this works for completeness and correctness
+;; TODO at some point please handle this case properly (not necessarily needed at this point given we only only at the first element)
+;; Technically speaking this isn't a huge problem given that we really only look at the FIRST element of the array but we make sure this works for completeness and correctness
+;; If we implement this it is beest to simply run the values through the main parse and check if there's a comma in between (essentially properly implement the proper state mechanism for this
 (let ((array-missing-comma (create-test-object "[1 2,3]")))
-  (pass "missing comma in array"))
+  (declare (ignore array-missing-comma))
+  (pass "This case will be implemented later"))
 
 (diag "unterminated object array")
 (let ((unterminated-object-array (create-test-object "[{\"tk1\":\"tv1\"]")))
-  (pass "unterminated object array"))
+  (is-error (parse unterminated-object-array) 'invalid-json-format))
 
 (diag "unterminated array in object")
 (let ((unterminated-array-object) (create-test-object "{\"tk1\":[1,2,3, \"tk2\":\"tv2\"}"))
-  (pass "unterminated array in object"))
+  (is-error (parse unterminated-array-object) 'invalid-json-format))
 
 ;;Unterminated strings and stuff are the lexers job to catch
 ;;If we're missing an opening bracket/brace the parser will simply return the type of the first object.

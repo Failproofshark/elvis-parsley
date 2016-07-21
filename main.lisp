@@ -195,14 +195,15 @@
                     (parse-array (token-stream)
                       (multiple-value-bind (array-structure remaining-tokens)
                           (parse-implementation token-stream)
-                        (let* ((skip-count (loop for token in remaining-tokens
-                                                 count t into token-count
-                                                 when (and (eq (getf token :type) :punctuation) (char= (getf token :value) #\]))
-                                                   do (return token-count)))
-                               (post-array-tokens (nthcdr skip-count remaining-tokens)))
-                          (values-list `((:type :array
-                                          :array-structure ,array-structure)
-                                         ,post-array-tokens)))))
+                        (let ((skip-count (loop for token in remaining-tokens
+                                                count t into token-count
+                                                when (and (eq (getf token :type) :punctuation) (char= (getf token :value) #\]))
+                                                  do (return token-count))))
+                          (if skip-count
+                              (values-list `((:type :array
+                                              :array-structure ,array-structure)
+                                             ,(nthcdr skip-count remaining-tokens)))
+                              (error 'invalid-json-format)))))
                     (parse-string (token-stream)
                       (values-list
                        `((:type :string)
