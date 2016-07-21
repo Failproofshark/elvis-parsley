@@ -7,7 +7,7 @@
 
 (defun create-test-object (json-string)
   (make-instance 'json-ast :source (make-string-input-stream json-string)))
-(plan 16)
+(plan 18)
 
 ;;TODO format these like the lexer tests
 (diag "Simple object")
@@ -51,27 +51,33 @@
 ;;TODO actually rename each error type
 (diag "unterminated object")
 (let ((unterminated-object (create-test-object "{\"tk1\":\"tv1\"")))
-  (is-error (parse unterminated-object) 'unterminated-object))
+  (is-error (parse unterminated-object) 'invalid-json-format))
 
 (diag "missing key")
 (let ((missing-key (create-test-object "{:\"tv1\"}")))
-  (is-error (parse missing-key) 'missing-key))
+  (is-error (parse missing-key) 'invalid-json-format))
+
+(let ((second-missing-key (create-test-object "{\"tk1\":\"tv1\", :\"tv2\"}")))
+  (is-error (parse second-missing-key) 'invalid-json-format))
 
 (diag "missing value")
-(let ((missing-value (create-test-object "{\"tk1\":}")))
-  (pass "missing value"))
+(let ((missing-value (create-test-object "{\"tk1\": }")))
+  (is-error (parse missing-value) 'invalid-json-format))
+
+(let ((missing-value-middle (create-test-object "{\"tk1\":\"tv1\", \"tk2\":, \"tk3\",\"tv3\"}")))
+  (is-error (parse missing-value-middle) 'invalid-json-format))
 
 (diag "missing colon")
 (let ((missing-colon (create-test-object "{\"tk1\"\"tv1\"}")))
-  (pass "missing colon"))
+  (is-error (parse missing-colon) 'invalid-json-format))
 
 (diag "missing comma")
 (let ((missing-comma (create-test-object "{\"tk1\":\"tv1\" \"tk2\":\"tv2\"}")))
-  (pass "missing comma"))
+  (is-error (parse missing-comma) 'invalid-json-format))
 
 (diag "unterminated embedded object")
 (let ((unterminated-embedded-object (create-test-object "{\"tk1\":\"tv1\", \"tk2\":{\"sk1\":{\"s2k1\":\"s2v1\"}}")))
-  (is-error (parse unterminated-embedded-object) 'unterminated-object))
+  (is-error (parse unterminated-embedded-object) 'invalid-json-format))
 
 (diag "unterminated array")
 (let ((unterminated-array (create-test-object "[1,2,3")))
