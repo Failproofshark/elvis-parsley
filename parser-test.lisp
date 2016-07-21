@@ -7,7 +7,7 @@
 
 (defun create-test-object (json-string)
   (make-instance 'json-ast :source (make-string-input-stream json-string)))
-(plan 18)
+(plan 21)
 
 ;;TODO format these like the lexer tests
 (diag "Simple object")
@@ -60,9 +60,16 @@
 (let ((second-missing-key (create-test-object "{\"tk1\":\"tv1\", :\"tv2\"}")))
   (is-error (parse second-missing-key) 'invalid-json-format))
 
+(let ((third-missing-key (create-test-object "{\"tk1\":\"tv1\", \"tv2\"}")))
+  (is-error (parse third-missing-key) 'invalid-json-format))
+
 (diag "missing value")
 (let ((missing-value (create-test-object "{\"tk1\": }")))
   (is-error (parse missing-value) 'invalid-json-format))
+(let ((second-missing-value (create-test-object "{\"tk1\", }")))
+  (is-error (parse second-missing-value) 'invalid-json-format))
+(let ((third-missing-value (create-test-object "{\"tk1\" ]}")))
+  (is-error (parse third-missing-value) 'invalid-json-format))
 
 (let ((missing-value-middle (create-test-object "{\"tk1\":\"tv1\", \"tk2\":, \"tk3\",\"tv3\"}")))
   (is-error (parse missing-value-middle) 'invalid-json-format))
