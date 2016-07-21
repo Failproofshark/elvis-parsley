@@ -44,9 +44,9 @@
 (diag "object with embedded array")
 (let ((object-with-array-element (create-test-object "{\"tk1\":[1,2,3], \"tk2\":[{\"e1\":\"v1\"}, {\"e1\":\"v2\"}], \"tk3\":4, \"tk4\":[\"blah\",\"bar\"]}")))
   (is (parse object-with-array-element) '(:type :object :key-value-pairs ((:key "tk1" :value (:type :array :array-structure (:type :int)))
-                                                                            (:key "tk2" :value (:type :array :array-structure (:type :object :key-value-pairs ((:key "e1" :value (:type :string))))))
-                                                                            (:key "tk3" :value (:type :int))
-                                                                            (:key "tk4" :value (:type :array :array-structure (:type :string)))))))
+                                                                          (:key "tk2" :value (:type :array :array-structure (:type :object :key-value-pairs ((:key "e1" :value (:type :string))))))
+                                                                          (:key "tk3" :value (:type :int))
+                                                                          (:key "tk4" :value (:type :array :array-structure (:type :string)))))))
 
 ;;TODO actually rename each error type
 (diag "unterminated object")

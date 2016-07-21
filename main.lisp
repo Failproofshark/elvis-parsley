@@ -229,3 +229,6 @@
                          ;;Empty token stream is valid
                          (t (error 'invalid-json-format)))))))
       (parse-implementation (tokens current-ast)))))
+
+(defmethod compile-tree ((current-ast json-ast))
+  ())
