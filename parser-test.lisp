@@ -103,7 +103,7 @@
   (is-error (parse unterminated-object-array) 'invalid-json-format))
 
 (diag "unterminated array in object")
-(let ((unterminated-array-object) (create-test-object "{\"tk1\":[1,2,3, \"tk2\":\"tv2\"}"))
+(let ((unterminated-array-object (create-test-object "{\"tk1\":[1,2,3, \"tk2\":\"tv2\"}")))
   (is-error (parse unterminated-array-object) 'invalid-json-format))
 
 ;;Unterminated strings and stuff are the lexers job to catch
