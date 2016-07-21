@@ -55,7 +55,7 @@
 
 (diag "missing key")
 (let ((missing-key (create-test-object "{:\"tv1\"}")))
-  (pass "missing key"))
+  (is-error (parse missing-key) 'missing-key))
 
 (diag "missing value")
 (let ((missing-value (create-test-object "{\"tk1\":}")))

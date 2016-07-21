@@ -15,7 +15,8 @@
            :tokens
            :invalid-token
            :erroneous-value
-           :unterminated-object))
+           :unterminated-object
+           :missing-key))
 
 (in-package :elvis-parsley)
 
@@ -138,6 +139,8 @@
   ())
 (define-condition missing-key (error)
   ())
+(define-condition invalid-json-format (error)
+  ())
 
 (defmethod parse ((current-ast json-ast))
   (declare (optimize (debug 3)))
@@ -150,31 +153,42 @@
                                         (token-value (getf current-token :value)))
                                    (cond ((null current-token) (error 'unterminated-object))
                                          ((and (eq :punctuation token-type) (char= #\} token-value)) (values-list `(,key-value-pairs
-                                                                                                                ,(cdr token-stream))))
+                                                                                                                    ,(cdr token-stream))))
                                          ((and (eq :punctuation token-type)
-                                               (or (char= #\, token-value) (char= #\: token-value))) (parse-key-value-pairs (cdr token-stream)
-                                                                                                                            current-state
-                                                                                                                            key-value-pairs
-                                                                                                                            current-key))
+                                               (char= #\, token-value)) (parse-key-value-pairs (cdr token-stream)
+                                                                                               current-state
+                                                                                               key-value-pairs
+                                                                                               current-key))
                                          ;; we wrap the result in a list because key-value pairs is supposed to be a list of p-lists
-                                         ((eq current-state :key) (parse-key-value-pairs (cdr token-stream)
-                                                                                         :value
-                                                                                         key-value-pairs
-                                                                                         (car token-stream)))
-                                         ((eq current-state :value) (multiple-value-bind (parsed-value remaining-tokens)
-                                                                        (parse-implementation token-stream)
-                                                                      (parse-key-value-pairs remaining-tokens
-                                                                                             :key
-                                                                                             (append key-value-pairs
-                                                                                                     `((:key ,(getf current-key :value)
-                                                                                                        :value ,parsed-value)))
-                                                                                             nil)))
-                                         (t (error 'invalid-json-format))))))
+                                         ((eq current-state :key) (if (and (eql (getf (car token-stream) :type) :punctuation)
+                                                                           (char= (getf (car token-stream) :value) #\:))
+                                                                      (error 'missing-key)
+                                                                      (parse-key-value-pairs (cdr token-stream)
+                                                                                             :value
+                                                                                             key-value-pairs
+                                                                                             (car token-stream))))
+                                         
+                                         ((eq current-state :value) (cond ((and (eql (getf (car token-stream) :type) :punctuation)
+                                                                                (char= (getf (car token-stream) :value) #\:))
+                                                                           (parse-key-value-pairs (cdr token-stream)
+                                                                                                  current-state
+                                                                                                  key-value-pairs
+                                                                                                  current-key))
+                                                                          (t (multiple-value-bind (parsed-value remaining-tokens)
+                                                                                 (parse-implementation token-stream)
+                                                                               (parse-key-value-pairs remaining-tokens
+                                                                                                      :key
+                                                                                                      (append key-value-pairs
+                                                                                                              `((:key ,(getf current-key :value)
+                                                                                                                 :value ,parsed-value)))
+                                                                                                      nil)))))
+                                         (t (error 'invalid-json-format)))))
+                               )
                         (multiple-value-bind (key-value-pairs remaining-tokens)
-                            (parse-key-value-pairs (cdr token-stream)
-                                                   :value
+                            (parse-key-value-pairs token-stream
+                                                   :key
                                                    nil
-                                                   (car token-stream))
+                                                   nil)
                           (values-list `((:type :object
                                           :key-value-pairs ,key-value-pairs)
                                          ,remaining-tokens)))))
