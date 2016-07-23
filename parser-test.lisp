@@ -11,14 +11,16 @@
 
 ;;TODO format these like the lexer tests
 (diag "Simple object")
-(let ((simple-flat-object (create-test-object "{\"tk1\":\"tk2\", \"tk2\":2, \"tk3\":3.4, \"tk4\": true, \"tk5\": null, \"tk6\":-38, \"tk7\":-.81}")))
+(let ((simple-flat-object (create-test-object "{\"tk1\":\"tk2\", \"tk2\":2, \"tk3\":3.4, \"tk4\": true, \"tk5\": null, \"tk6\":-38, \"tk7\":-.81, \"tk8\":+20, \"tk9\":+.14}")))
   (is (parse simple-flat-object) '(:type :object :key-value-pairs ((:key "tk1" :value (:type :string))
                                                                    (:key "tk2" :value (:type :int))
                                                                    (:key "tk3" :value (:type :float))
                                                                    (:key "tk4" :value (:type :boolean))
                                                                    (:key "tk5" :value (:type :null))
-                                                                   (:key "tk6" :value (:type :float))
-                                                                   (:key "tk7" :value (:type :float))))))
+                                                                   (:key "tk6" :value (:type :int))
+                                                                   (:key "tk7" :value (:type :float))
+                                                                   (:key "tk8" :value (:type :int))
+                                                                   (:key "tk9" :value (:type :float))))))
 
 (diag "embedded object")
 (let ((embedded-object (create-test-object "{\"tk1\":{\"stk1\":\"stv2\", \"stk2\":2}, \"tk2\":{\"s1tk1\": {\"s2tk1\": { \"s3tk1\":1, \"s3tk2\":\"stv2\"}, \"s2tk2\":5.6}}, \"tk3\":\"tv3\"}")))

@@ -140,7 +140,7 @@
   ;; Each parse-function accepts a token and a state which is a symbol :key or :value indicating what exactly we're looking (useful for naming and stuff)
   (let ((float-scanner (create-scanner '(:sequence (:greedy-repetition 0 nil :digit-class) 
                                          #\. 
-                                         (:greedy-repetition 0 nil :digit-class)))))
+                                         (:greedy-repetition 1 nil :digit-class)))))
     (labels ((parse-implementation (token-stream)
                (labels ((parse-object (token-stream)
                           (labels ((parse-key-value-pairs (token-stream current-state key-value-pairs current-key)
