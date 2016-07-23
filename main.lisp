@@ -1,5 +1,3 @@
-;;TODO need to account for escaped quotes in lexer
-;;TODO need to be able to throw "malformed json"
 ;;TODO add support for exponential numbers
 ;;TODO write tests for the lexer and parser (JSON)
 (in-package :cl)
@@ -45,16 +43,18 @@
 
 (defmethod lex ((current-ast json-ast))
   (declare (optimize (debug 3)))
-  (let ((integer-scanner (create-scanner '(:sequence (:greedy-repetition 1 nil :digit-class))))
+  (let ((integer-scanner (create-scanner '(:sequence :start-anchor (:greedy-repetition 0 1 (:alternation #\+ #\-)) (:greedy-repetition 1 nil :digit-class) :end-anchor)))
         ;; This covers the case of a number followed by a period then nothing following e.g. 2. or 1.
         ;; We do not include this in the regular fraction scanner because [0-9]*\.[0-9]* would mean that a lone period is a valid number which is incorrect
         (whole-fraction-scanner (create-scanner '(:sequence
                                                   :start-anchor
+                                                  (:greedy-repetition 0 1 (:alternation #\+ #\-))
                                                   (:greedy-repetition 1 nil :digit-class)
                                                   #\.
                                                   :end-anchor)))
         (fraction-scanner (create-scanner '(:sequence
                                             :start-anchor
+                                            (:greedy-repetition 0 1 (:alternation #\+ #\-))
                                             (:greedy-repetition 0 nil :digit-class)
                                             #\.
                                             (:greedy-repetition 1 nil :digit-class)
@@ -125,7 +125,10 @@
                     collect (cond ((is-punctuation current-character) (read-punctuation source))
                                   ((is-open-quote current-character) (read-in-string source))
                                   ((is-start-of-keyword current-character) (read-unquoted-string source))
-                                  ((or (digit-char-p current-character) (char= current-character #\.)) (read-unquoted-string source))
+                                  ((or (digit-char-p current-character)
+                                       (char= current-character #\.)
+                                       (char= current-character #\+)
+                                       (char= current-character #\-)) (read-unquoted-string source))
                                   (t (error 'invalid-parsing-case :erroneous-value current-character)))))))))
 
 ;;TODO use pop to move the list along OR keep track of how far you need to move with some sort of counter and use nthcdr
@@ -208,7 +211,7 @@
                              ,(cdr token-stream))))
                         (parse-number (token-stream)
                           (values-list `(,(let ((value (getf (car token-stream) :value)))
-                                            (if (scan *float-re-test* value)
+                                            (if (scan float-scanner value)
                                                 `(:type :float)
                                                 `(:type :int)))
                                          ,(cdr token-stream))))
