@@ -5,11 +5,14 @@
    :elvis-parsley))
 (in-package :lexer-test)
 
-(plan 9)
+(plan 7)
 
 (diag "Normal object test case")
-(let ((normal-object (make-string-input-stream "{\"tk1\":1, \"tk2\":2.8, \"tk3\":\"tv3\", \"tk4\":true, \"tk5\":false, \"tk6\":null, \"tk7\":{\"sk1\":\"sv1\"}, \"tk8\":[1,2,3], \"tk9\":3., \"tk10\":432, \"tk11\":.14, \"tk12\":-1, \"tk13\":-.38, \"tk14\":-48.546, \"tk15\":+48.546, \"tk16\":+85, \"tk17\":+.916}")))
-  (is (tokens (make-instance 'json-ast :source normal-object))
+(let ((normal-object (make-instance 'json-ast)))
+  (is (progn
+        (with-open-stream (stream (make-string-input-stream "{\"tk1\":1, \"tk2\":2.8, \"tk3\":\"tv3\", \"tk4\":true, \"tk5\":false, \"tk6\":null, \"tk7\":{\"sk1\":\"sv1\"}, \"tk8\":[1,2,3], \"tk9\":3., \"tk10\":432, \"tk11\":.14, \"tk12\":-1, \"tk13\":-.38, \"tk14\":-48.546, \"tk15\":+48.546, \"tk16\":+85, \"tk17\":+.916}"))
+          (lex normal-object stream))        
+        (tokens normal-object))
       '((:type :punctuation :value #\{)
         (:type :string :value "tk1")
         (:type :punctuation :value #\:)
@@ -91,8 +94,11 @@
         (:type :punctuation :value #\}))))
 
 (diag "Normal array test case")
-(let ((array-stream (make-string-input-stream "[\"a1\",\"b2\",\"c3\"]")))
-  (is (tokens (make-instance 'json-ast :source array-stream))
+(let ((normal-array (make-instance 'json-ast)))
+  (is (progn
+        (with-open-stream (stream (make-string-input-stream "[\"a1\",\"b2\",\"c3\"]"))
+          (lex normal-array stream))
+        (tokens normal-array)) 
       '((:type :punctuation :value #\[)
         (:type :string :value "a1")
         (:type :punctuation :value #\,)
@@ -102,36 +108,39 @@
         (:type :punctuation :value #\]))))
 
 (diag "Invalid number test case")
-(let ((bad-number-stream (make-string-input-stream "{\"tk1\":tasdf}")))
-  (is-error (tokens (make-instance 'json-ast :source bad-number-stream))
+(let ((bad-number-object (make-instance 'json-ast)))
+  (is-error (with-open-stream (stream (make-string-input-stream "{\"tk1\":tasdf}"))
+              (lex bad-number-object stream))
             'invalid-token))
 
 (diag "Invalid keyword test cases")
-(let ((bad-keyword-stream (make-string-input-stream "{\"tk1\": trug}")))
-  (is-error (tokens (make-instance 'json-ast :source bad-keyword-stream))
-            'invalid-token))
-(let ((bad-keyword-stream (make-string-input-stream "{\"tk1\": faenf}")))
-  (is-error (tokens (make-instance 'json-ast :source bad-keyword-stream))
-            'invalid-token))
-(let ((bad-keyword-stream (make-string-input-stream "{\"tk1\": nole}")))
-  (is-error (tokens (make-instance 'json-ast :source bad-keyword-stream))
+(let ((bad-keyword-object (make-instance 'json-ast)))
+  (is-error (with-open-stream (stream (make-string-input-stream "{\"tk1\": trug}"))
+              (lex bad-keyword-object stream))
             'invalid-token))
 
 (diag "unterminated string")
-(let ((unterminated-string (make-string-input-stream "{\"tk1\":\"tv1}")))
-  (is-error (tokens (make-instance 'json-ast :source unterminated-string))
+(let ((unterminated-string-object (make-instance 'json-ast)))
+  (is-error (with-open-stream (stream (make-string-input-stream "{\"tk1\":\"tv1}"))
+              (lex unterminated-string-object stream))
             'invalid-token))
 
 ;;TODO write "correct" response tests for lexer
 ;;This test is based on an error I found from my own testing
 (diag "Unterminated object with number values (\"numbers are known as unquoted objects\")")
-(let ((unterminated-object-unquoted (make-string-input-stream "{\"tk1\":1, \"tk2\":2")))
-  (is (tokens (make-instance 'json-ast :source unterminated-object-unquoted))
+(let ((unterminated-object-unquoted (make-instance 'json-ast)))
+  (is (progn
+        (with-open-stream (stream (make-string-input-stream "{\"tk1\":1, \"tk2\":2"))
+          (lex unterminated-object-unquoted stream))
+        (tokens unterminated-object-unquoted))
       '((:type :punctuation :value #\{) (:type :string :value "tk1") (:type :punctuation :value #\:) (:type :number :value "1") (:type :punctuation :value #\,) (:type :string :value "tk2") (:type :punctuation :value #\:) (:type :number :value "2"))))
 
 (diag "Unterminated array of numbers")
-(let ((unterminated-array-unquoted (make-string-input-stream "[1,2,3")))
-  (is (tokens (make-instance 'json-ast :source unterminated-array-unquoted))
+(let ((unterminated-array-unquoted (make-instance 'json-ast)))
+  (is (progn
+        (with-open-stream (stream (make-string-input-stream "[1,2,3"))
+          (lex unterminated-array-unquoted stream))
+        (tokens unterminated-array-unquoted))
       '((:type :punctuation :value #\[) (:type :number :value "1") (:type :punctuation :value #\,) (:type :number :value "2") (:type :punctuation :value #\,) (:type :number :value "3"))))
 
 (finalize) 

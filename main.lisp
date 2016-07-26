@@ -9,8 +9,10 @@
                :create-scanner
                :scan)
   (:export :json-ast
+           :lex
            :parse
            :tokens
+           :json->pojo
            :invalid-token
            :erroneous-value
            :invalid-json-format))
@@ -18,20 +20,14 @@
 (in-package :elvis-parsley)
 
 (defclass ast ()
-  ((source :initarg :source
-           :accessor source)
-   (tokens :accessor tokens)
+  ((tokens :accessor tokens)
    (tree :accessor tree)))
 
 (defclass json-ast (ast)
   ())
 
-(defgeneric lex (ast))
+(defgeneric lex (ast source))
 (defgeneric parse (ast))
-(defgeneric compile-tree (ast))
-
-(defmethod initialize-instance :after ((current-ast json-ast) &key &allow-other-keys)
-  (lex current-ast))
 
 (define-condition invalid-token (error)
   ((erroneous-value :initarg :erroneous-value
@@ -41,8 +37,7 @@
   ((erroneous-value :initarg :erroneous-value
                     :accessor erroneous-value)))
 
-(defmethod lex ((current-ast json-ast))
-  (declare (optimize (debug 3)))
+(defmethod lex ((current-ast json-ast) source)
   (let ((integer-scanner (create-scanner '(:sequence :start-anchor (:greedy-repetition 0 1 (:alternation #\+ #\-)) (:greedy-repetition 1 nil :digit-class) :end-anchor)))
         ;; This covers the case of a number followed by a period then nothing following e.g. 2. or 1.
         ;; We do not include this in the regular fraction scanner because [0-9]*\.[0-9]* would mean that a lone period is a valid number which is incorrect
@@ -59,7 +54,7 @@
                                             #\.
                                             (:greedy-repetition 1 nil :digit-class)
                                             :end-anchor))))
-    (with-accessors ((source source) (tokens tokens)) current-ast
+    (with-accessors ((tokens tokens)) current-ast
       (setf tokens
             (labels ((contains (current-character search-string)
                        (loop for search-character across search-string
@@ -87,7 +82,7 @@
                            (scan whole-fraction-scanner token)))
                      
                      (read-until-termination (stream condition)
-                       (let ((new-string (make-string-output-stream)))
+                       (with-open-stream (new-string (make-string-output-stream))
                          (loop for current-character = (peek-char t stream nil :END-OF-FILE)
                                do (cond ((eql current-character :END-OF-FILE) (return (values-list `(:END-OF-FILE ,(get-output-stream-string new-string)))))
                                         ((funcall condition current-character) (return (get-output-stream-string new-string)))
@@ -95,11 +90,11 @@
 
                      (read-unquoted-string (stream)
                        (let* ((value-read (multiple-value-list (read-until-termination stream #'(lambda (current-character)
-                                                                                                   (or (char= current-character #\})
-                                                                                                       (char= current-character #\])
-                                                                                                       (char= current-character #\,)
-                                                                                                       ;;TODO may need to change this depending on if this is present in a given lisp implementation
-                                                                                                       (char= current-character #\space))))))
+                                                                                                  (or (char= current-character #\})
+                                                                                                      (char= current-character #\])
+                                                                                                      (char= current-character #\,)
+                                                                                                      ;;TODO may need to change this depending on if this is present in a given lisp implementation
+                                                                                                      (char= current-character #\space))))))
                               (value (if (> (length value-read) 1)
                                          (cadr value-read)
                                          (car value-read))))
@@ -232,6 +227,3 @@
                          ;;Empty token stream is valid
                          (t (error 'invalid-json-format)))))))
       (parse-implementation (tokens current-ast)))))
-
-(defmethod compile-tree ((current-ast json-ast))
-  ())
