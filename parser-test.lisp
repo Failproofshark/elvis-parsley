@@ -6,7 +6,11 @@
 (in-package :parser-test)
 
 (defun create-test-object (json-string)
-  (make-instance 'json-ast :source (make-string-input-stream json-string)))
+  (with-open-stream (stream (make-string-input-stream json-string))
+    (let ((new-json-ast (make-instance 'json-ast)))
+      (lex new-json-ast stream)
+      new-json-ast)))
+
 (plan 21)
 
 ;;TODO format these like the lexer tests
