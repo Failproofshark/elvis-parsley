@@ -226,4 +226,43 @@
                          ((eq :keyword (getf current-token :type)) (parse-keyword token-stream))
                          ;;Empty token stream is valid
                          (t (error 'invalid-json-format)))))))
-      (parse-implementation (tokens current-ast)))))
+      (setf (tree current-ast) (parse-implementation (tokens current-ast))))))
+
+;; to-be-defined-stack item structure should include an ancestor list for class name generation or have parent name?
+(defun json->pojo (json-ast name-of-root &optional debug)
+  (declare (ignore debug))
+  (let ((object-definitions (make-hash-table :test 'equalp))
+        (to-be-defined-stack `((,(tree json-ast) ,name-of-root))))
+    (flet ((compile-object (object name)
+             (let ((constituents nil)
+                   (getters-and-setters nil))
+               (flet ((add-to-component-stacks (field-type field-name)
+                        (push (format nil
+                                      "Private ~a ~a;"
+                                      field-type
+                                      field-name)
+                              constituents)
+                        (push (format nil
+                                      "Public ~a get~@(~a~)() { return ~:*~a; }~%    Public ~2:*~a set~@(~a~)(~2:*~a newValue) { ~a = newValue; }"
+                                      field-type
+                                      field-name)
+                              getters-and-setters)))
+                 (loop for pair in (getf object :key-value-pairs) do
+                   (let ((field-type (getf (getf pair :value) :type))
+                         (field-name (getf pair :key)))
+                     (cond ((or (eql field-type :int)
+                                (eql field-type :float)
+                                (eql field-type :boolean))
+                            (add-to-component-stacks (string-downcase (symbol-name field-type)) field-name))
+                           ((eql field-type :string) (add-to-component-stacks (string-capitalize (symbol-name field-type)) field-name))
+                           ;; Just to hold a null object for completeness
+                           ((eql field-type :null) (add-to-component-stacks "Object" field-name)))))
+                 (setf (gethash name object-definitions)
+                       (format nil
+                               "Public class ~@(~a~) {~%~{    ~a~%~}~%~%~{    ~a~%~}~%}"
+                               name
+                               constituents
+                               getters-and-setters))))))
+      (loop for component in to-be-defined-stack do
+        (apply #'compile-object component)))
+    object-definitions))
