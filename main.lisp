@@ -132,6 +132,7 @@
   ())
 
 (defmethod parse ((current-ast json-ast))
+  (declare (optimize (debug 3)))
   ;; Each parse-function accepts a token and a state which is a symbol :key or :value indicating what exactly we're looking (useful for naming and stuff)
   (let ((float-scanner (create-scanner '(:sequence (:greedy-repetition 0 nil :digit-class) 
                                          #\. 
@@ -229,40 +230,84 @@
       (setf (tree current-ast) (parse-implementation (tokens current-ast))))))
 
 ;; to-be-defined-stack item structure should include an ancestor list for class name generation or have parent name?
-(defun json->pojo (json-ast name-of-root &optional debug)
-  (declare (ignore debug))
+(define-condition unknown-type-error (error)
+  ())
+;;Format helper functions must be part of the package not a closure
+(defun capitalize-first (stream word colon at-sign)
+  (declare (ignore colon at-sign))
+  (princ (string-capitalize word :end 1) stream))
+
+(defun json->pojo (json-ast name-of-root)
   (let ((object-definitions (make-hash-table :test 'equalp))
-        (to-be-defined-stack `((,(tree json-ast) ,name-of-root))))
-    (flet ((compile-object (object name)
-             (let ((constituents nil)
-                   (getters-and-setters nil))
-               (flet ((add-to-component-stacks (field-type field-name)
-                        (push (format nil
-                                      "Private ~a ~a;"
-                                      field-type
-                                      field-name)
-                              constituents)
-                        (push (format nil
-                                      "Public ~a get~@(~a~)() { return ~:*~a; }~%    Public ~2:*~a set~@(~a~)(~2:*~a newValue) { ~a = newValue; }"
-                                      field-type
-                                      field-name)
-                              getters-and-setters)))
-                 (loop for pair in (getf object :key-value-pairs) do
-                   (let ((field-type (getf (getf pair :value) :type))
-                         (field-name (getf pair :key)))
-                     (cond ((or (eql field-type :int)
-                                (eql field-type :float)
-                                (eql field-type :boolean))
-                            (add-to-component-stacks (string-downcase (symbol-name field-type)) field-name))
-                           ((eql field-type :string) (add-to-component-stacks (string-capitalize (symbol-name field-type)) field-name))
-                           ;; Just to hold a null object for completeness
-                           ((eql field-type :null) (add-to-component-stacks "Object" field-name)))))
-                 (setf (gethash name object-definitions)
-                       (format nil
-                               "Public class ~@(~a~) {~%~{    ~a~%~}~%~%~{    ~a~%~}~%}"
-                               name
-                               constituents
-                               getters-and-setters))))))
-      (loop for component in to-be-defined-stack do
-        (apply #'compile-object component)))
-    object-definitions))
+        (to-be-defined-stack nil))
+    (labels ((determine-type (node field-type full-name is-array)
+               (cond ((eql field-type :int)
+                      (if is-array
+                          "Integer"
+                          (string-downcase (symbol-name field-type))))
+                     ((or (eql field-type :float)
+                          (eql field-type :boolean))
+                      (if is-array
+                          (string-capitalize (symbol-name field-type))
+                          (string-downcase (symbol-name field-type))))
+                     ((eql field-type :string) (string-capitalize (symbol-name field-type)))
+                     ;; Just to hold a null object for completeness
+                     ((eql field-type :null) "Object")
+                     ((eql field-type :object)
+                      (push `(,node ,full-name) to-be-defined-stack)
+                      full-name)
+                     (t (error 'unknown-type-error))))
+             
+             (compile-array (node name)
+               (format nil "ArrayList<~a>" (determine-type (getf node :array-structure)
+                                                           (getf (getf node :array-structure) :type)
+                                                           name
+                                                           t)))
+             
+             (compile-object (object root-name)
+               (let ((constituents nil)
+                     (getters-and-setters nil))
+                 (flet ((add-to-component-stacks (field-type field-name)
+                          (push (format nil
+                                        "Private ~a ~a;"
+                                        field-type
+                                        field-name)
+                                constituents)
+                          (push (format nil
+                                        "Public ~a get~/elvis-parsley:capitalize-first/() { return ~:*~a; }~%    Public ~2:*~a set~/elvis-parsley:capitalize-first/(~2:*~a newValue) { ~a = newValue; }"
+                                        field-type
+                                        field-name)
+                                getters-and-setters)))
+                   (loop for pair in (getf object :key-value-pairs) do
+                     (let* ((node (getf pair :value))
+                            (field-type (getf node :type))
+                            (field-name (getf pair :key))
+                            (full-name (format nil
+                                               "~a~a"
+                                               (string-capitalize root-name :end 1)
+                                               (string-capitalize field-name :end 1))))
+                       (if (eql field-type :array)
+                           (add-to-component-stacks (compile-array node full-name) field-name)
+                           (add-to-component-stacks (determine-type node
+                                                                    field-type
+                                                                    full-name
+                                                                    nil)
+                                                    field-name))))
+                   (setf (gethash root-name object-definitions)
+                         (format nil
+                                 "Public class ~a {~%~%    ~:*~a() {}~%~%~{    ~a~%~}~%~{    ~a~%~}~%}"
+                                 root-name
+                                 constituents
+                                 getters-and-setters))))))
+      ;; Handle the case when we are initially dealing with an array
+      (let ((root-object (if (eql (getf (tree json-ast) :type) :array)
+                             (compile-array (tree json-ast) name-of-root)
+                             (progn
+                               (push `(,(tree json-ast) ,name-of-root) to-be-defined-stack)
+                               (string-capitalize name-of-root :end 1)))))
+        (loop
+          (let ((component (pop to-be-defined-stack)))
+            (if component
+                (apply #'compile-object component)
+                (return))))
+        (values-list `(,root-object ,object-definitions))))))
